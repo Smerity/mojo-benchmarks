@@ -1,3 +1,4 @@
+from math import e
 import numpy as np
 
 import time
@@ -23,8 +24,6 @@ def crc16(data, poly=0x8408):
     return crc & 0xFFFF
 
 
-# bench it and get mean time
-time_limit = 5
 arr_size = 100000
 
 
@@ -41,15 +40,12 @@ arr = initialize(arr_size)
 # warm up
 crc16(arr)
 
+print("CRC16: ", crc16(arr))
+times = 100
 # bench
-times = []
 start = time.time()
-while sum(times) < time_limit:
-    bstart = time.time()
+for i in range(times):
     crc16(arr)
-    now = time.time()
-    times.append(now - bstart)
-    if now - start > time_limit:
-        break
 
-print("Mean time: ", np.mean(times))
+end = time.time()
+print("Mean time: ", (end - start) / times)

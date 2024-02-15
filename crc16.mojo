@@ -14,6 +14,7 @@ fn crc16_naive[len: Int, poly: Int](data: DTypePointer[type]) -> Int:
     for b in range(len):
         var cur_byte = 0xFF & data[b]
 
+        @unroll
         for _ in range(0, 8):
             if (crc & 0x0001) ^ (cur_byte & 0x0001):
                 crc = (crc >> 1) ^ poly

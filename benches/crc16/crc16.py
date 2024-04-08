@@ -1,4 +1,3 @@
-from math import e
 import sys
 import numpy as np
 
@@ -26,7 +25,7 @@ def crc16(data, poly=0x8408):
     return crc & 0xFFFF
 
 
-def initialize(N):
+def initialize(arr_size):
     from numpy.random import default_rng
 
     rng = default_rng(42)
@@ -46,21 +45,27 @@ def test():
     assert crc == 0x6E90
 
 
-test()
+def main():
 
-arr_size = int(sys.argv[1])
+    test()
 
-arr = initialize(arr_size)
+    arr_size = int(sys.argv[1])
 
-# warm up
-crc16(arr)
+    arr = initialize(arr_size)
 
-# print("CRC16: ", crc16(arr))
-times = 10
-# bench
-start = time.time()
-for i in range(times):
+    # warm up
     crc16(arr)
 
-end = time.time()
-print(f"Mean time: { ((end - start) / times)*1000}ms")
+    # print("CRC16: ", crc16(arr))
+    times = 10
+    # bench
+    start = time.time()
+    for i in range(times):
+        crc16(arr)
+
+    end = time.time()
+    print(f"Mean time: { ((end - start) / times)*1000}ms")
+
+
+if __name__ == "__main__":
+    main()

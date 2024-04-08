@@ -50,6 +50,7 @@ fn test() raises:
         raise "Test failed"
 
 
+
 fn main() raises:
     test()
     # size is 1 arg from sys
@@ -61,21 +62,17 @@ fn main() raises:
     var py = Python.import_module("builtins")
     # _ = py.print(py.str("Starting benchmark, size {}...").format(size))
 
-    var res = 0
-    res = crc16_naive[0xFFFF](arr, size)
-    var tainted = False
-    var iters = 0
+    var crc = crc16_naive[0x8408](arr, size)
 
     @always_inline
     @parameter
     fn worker():
-        var bres = crc16_naive[0xFFFF](arr, size)
+        var bres = crc16_naive[0x8408](arr, size)
         benchmark.keep(bres)  # do not optimize out
 
     var r = benchmark.run[worker](max_runtime_secs=5)
 
-    if tainted:
-        raise "Tainted result"
+    arr.free()
 
     # _ = py.print(py.str("Result: {}, iters: {}").format(res, iters))
 

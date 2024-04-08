@@ -25,6 +25,7 @@ def bench_rust(name, size):
 
 size_defaults = {
     "crc16": 100000,
+    "quicksort": 10000,
 }
 
 
@@ -41,7 +42,7 @@ def main():
         print("no bench named", name)
         return
 
-    print(f"Benching {name}")
+    print(f"Benching {name} (size {size})")
     bench_py(name, size)
     bench_mojo(name, size)
     bench_rust(name, size)

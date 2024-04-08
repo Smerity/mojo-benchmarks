@@ -1,4 +1,5 @@
 from math import e
+import sys
 import numpy as np
 
 import time
@@ -9,6 +10,7 @@ def crc16(data, poly=0x8408):
     """
     CRC-16-CCITT Algorithm
     """
+
     crc = 0xFFFF
     for b in data:
         cur_byte = 0xFF & b
@@ -24,9 +26,6 @@ def crc16(data, poly=0x8408):
     return crc & 0xFFFF
 
 
-arr_size = 100000
-
-
 def initialize(N):
     from numpy.random import default_rng
 
@@ -35,17 +34,33 @@ def initialize(N):
     return data
 
 
+def test():
+
+    # fn test() {
+    #     let s = "12345678".as_bytes();
+    #     assert_eq!(crc16(&s), 50389);
+    # }
+    s = b"\x31\x32\x33\x34\x35\x36\x37\x38\x39"
+    # print as ascii
+    crc = crc16(s)
+    assert crc == 0x6E90
+
+
+test()
+
+arr_size = int(sys.argv[1])
+
 arr = initialize(arr_size)
 
 # warm up
 crc16(arr)
 
-print("CRC16: ", crc16(arr))
-times = 100
+# print("CRC16: ", crc16(arr))
+times = 10
 # bench
 start = time.time()
 for i in range(times):
     crc16(arr)
 
 end = time.time()
-print("Mean time: ", (end - start) / times)
+print(f"Mean time: { ((end - start) / times)*1000}ms")

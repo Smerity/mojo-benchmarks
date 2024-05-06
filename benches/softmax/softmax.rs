@@ -1,9 +1,16 @@
+#![feature(portable_simd)]
+
 use std::fs::File;
 use std::hint::black_box;
 use std::io::Read;
+use std::mem::MaybeUninit;
+use std::simd::num::SimdFloat;
+use std::simd::{f64x64, StdFloat};
 
 #[allow(non_upper_case_globals)]
 const bench_size: usize = 1000000;
+
+const SIMD_COUNT: usize = bench_size / 64;
 
 fn softmax(x: &[f64; bench_size]) -> [f64; bench_size] {
     let mut max = x[0];
@@ -24,6 +31,22 @@ fn softmax(x: &[f64; bench_size]) -> [f64; bench_size] {
     for i in 0..x.len() {
         probs[i] = x_exp[i] / x_exp_sum;
     }
+
+    probs
+}
+
+fn softmax_simd(x: &[f64x64; SIMD_COUNT]) -> [f64x64; SIMD_COUNT] {
+    let max: f64 = *x
+        .map(|v| v.reduce_max())
+        .iter()
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap();
+    let max = f64x64::splat(max);
+
+    let x_exp = x.map(|v| (v - max).exp());
+    let x_exp_sum = x_exp.iter().map(|v| v.reduce_sum()).sum();
+    let divide_by = f64x64::splat(x_exp_sum);
+    let probs = x_exp.map(|v| v / divide_by);
 
     probs
 }
@@ -62,7 +85,30 @@ fn main() {
     let elapsed = start.elapsed().as_nanos();
 
     println!(
-        "Mean time: {}ms",
+        "Mean time (native): {}ms",
+        elapsed as f64 / 1000.0 / 1000.0 / count as f64
+    );
+
+    // prepare array of simd vectors
+
+    let mut simd_arr: [f64x64; SIMD_COUNT] = unsafe {
+        #[allow(invalid_value)]
+        MaybeUninit::uninit().assume_init()
+    };
+
+    for i in 0..SIMD_COUNT {
+        simd_arr[i] = f64x64::from_slice(&arr[i * 64..]);
+    }
+
+    // benchmark this 1000 times, get mean
+    let start = std::time::Instant::now();
+    for _ in 0..count {
+        black_box(softmax_simd(&simd_arr));
+    }
+    let elapsed = start.elapsed().as_nanos();
+
+    println!(
+        "Mean time   (SIMD): {}ms",
         elapsed as f64 / 1000.0 / 1000.0 / count as f64
     );
 }

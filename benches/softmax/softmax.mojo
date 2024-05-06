@@ -18,7 +18,7 @@ def softmax_native(x: list[float]) -> list[float]:
 """
 
 
-fn softmax(x: DTypePointer[type], len: Int) -> DTypePointer[type]:
+fn softmax[len: Int](x: DTypePointer[type]) -> DTypePointer[type]:
     var max = x[0]
     for i in range(1, len):
         if x[i] > max:
@@ -55,7 +55,7 @@ def test():
         mojoin[i] = val.to_float64()
 
     var res_py = pysoftmax.softmax_native(pyin)
-    var res_mojo = softmax(mojoin, 10)
+    var res_mojo = softmax[10](mojoin)
 
     for i in range(10):
         # acceptable error margin due to float precision
@@ -79,12 +79,12 @@ fn main() raises:
     var py = Python.import_module("builtins")
     # _ = py.print(py.str("Starting benchmark, size {}...").format(size))
 
-    var res = softmax(arr, bench_size)
+    var res = softmax[bench_size](arr)
 
     @always_inline
     @parameter
     fn worker():
-        var bres = softmax(arr, bench_size)
+        var bres = softmax[bench_size](arr)
         benchmark.keep(bres)  # do not optimize out
         bres.free()
 

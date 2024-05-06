@@ -4,6 +4,7 @@ from random import rand, seed
 from python import Python
 
 alias type = DType.int8
+alias bench_size = 1000000
 
 
 fn print(s: String):
@@ -15,7 +16,7 @@ fn print(s: String):
 
 
 @always_inline
-fn crc16_naive[poly: Int](data: DTypePointer[type], len: Int) -> Int:
+fn crc16_naive[poly: Int, len: Int](data: DTypePointer[type]) -> Int:
     # CRC-16-CCITT Algorithm
     # naively ported from python version
 
@@ -44,7 +45,7 @@ fn test() raises:
     var data: DTypePointer[type] = s.data()
 
     # print as asci
-    var crc = crc16_naive[0x8408](data, len(s))
+    var crc = crc16_naive[0x8408, 9](data)
 
     if not crc == 0x6E90:
         raise "Test failed"
@@ -53,20 +54,19 @@ fn test() raises:
 fn main() raises:
     test()
     # size is 1 arg from sys
-    var size = StringRef.__int__(sys.argv()[1])
-    var arr = DTypePointer[type].alloc(size)
+    var arr = DTypePointer[type].alloc(bench_size)
     # seed(1)
-    rand(arr, size)
+    rand(arr, bench_size)
 
     var py = Python.import_module("builtins")
     # _ = py.print(py.str("Starting benchmark, size {}...").format(size))
 
-    var crc = crc16_naive[0x8408](arr, size)
+    var crc = crc16_naive[0x8408, bench_size](arr)
 
     @always_inline
     @parameter
     fn worker():
-        var bres = crc16_naive[0x8408](arr, size)
+        var bres = crc16_naive[0x8408, bench_size](arr)
         benchmark.keep(bres)  # do not optimize out
 
     var r = benchmark.run[worker](max_runtime_secs=5)

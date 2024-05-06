@@ -3,6 +3,8 @@ use std::hint::black_box;
 use std::io::Read;
 
 type Data = u8;
+#[allow(non_upper_case_globals)]
+const bench_size: usize = 1000000;
 
 fn quicksort(data: &mut Vec<Data>, left: isize, right: isize) {
     if left >= right {
@@ -29,21 +31,19 @@ fn quicksort(data: &mut Vec<Data>, left: isize, right: isize) {
 
 fn main() {
     test();
-    let size = std::env::args().nth(1).unwrap();
-    let size = size.parse::<isize>().unwrap();
     // arr is u8 1000000 of random elements allocated on heap
-    let mut arr: Vec<Data> = vec![0u8; size as usize];
+    let mut arr: Vec<Data> = vec![0u8; bench_size as usize];
     let mut f = File::open("/dev/urandom").unwrap();
     f.read_exact(arr.as_mut()).unwrap();
 
     let mut cpy = arr.clone();
-    quicksort(&mut cpy, 0, size - 1);
+    quicksort(&mut cpy, 0, (bench_size - 1) as isize);
 
     let start = std::time::Instant::now();
     let count = 1000;
     for _ in 0..count {
         let mut cpy = arr.clone();
-        quicksort(&mut cpy, 0, size - 1);
+        quicksort(&mut cpy, 0, (bench_size - 1) as isize);
         let _keep = black_box(cpy);
     }
     let elapsed = start.elapsed().as_nanos();

@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 
+bench_size = 10000
 
 def quicksort(data, left, right):
     if left >= right:
@@ -38,10 +39,8 @@ def test():
 def main():
     test()
 
-    arr_size = int(sys.argv[1]) if len(sys.argv) > 1 else 100
-
     rng = np.random.default_rng(42)
-    arr = rng.integers(0, 256, size=(arr_size,), dtype=np.uint8)
+    arr = rng.integers(0, 256, size=(bench_size,), dtype=np.uint8)
 
     # warm up
     test_arr = arr.copy()

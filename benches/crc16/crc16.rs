@@ -2,6 +2,9 @@ use std::fs::File;
 use std::hint::black_box;
 use std::io::Read;
 
+#[allow(non_upper_case_globals)]
+const bench_size: usize = 1000000;
+
 fn crc16(data: &[u8]) -> u16 {
     let poly = 0x8408;
     let mut crc: u16 = 0xffff;
@@ -25,10 +28,8 @@ fn crc16(data: &[u8]) -> u16 {
 
 fn main() {
     test();
-    let size = std::env::args().nth(1).unwrap();
-    let size = size.parse::<usize>().unwrap();
     // arr is u8 1000000 of random elements allocated on heap
-    let mut arr = vec![0u8; size];
+    let mut arr = vec![0u8; bench_size];
     let mut f = File::open("/dev/urandom").unwrap();
     f.read_exact(&mut arr).unwrap();
 

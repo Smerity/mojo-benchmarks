@@ -5,6 +5,7 @@ from python import Python
 import math
 
 alias type = DType.float64
+alias bench_size = 100000
 
 """
 
@@ -70,25 +71,20 @@ def test():
 
 fn main() raises:
     test()
-    # size is 1 arg from sys
-    var argv = sys.argv()
-    var size = 100000
-    if argv.__len__() > 1:
-        size = StringRef.__int__(argv[1])
 
-    var arr = DTypePointer[type].alloc(size)
+    var arr = DTypePointer[type].alloc(bench_size)
     # seed(1)
-    rand(arr, size)
+    rand(arr, bench_size)
 
     var py = Python.import_module("builtins")
     # _ = py.print(py.str("Starting benchmark, size {}...").format(size))
 
-    var res = softmax(arr, size)
+    var res = softmax(arr, bench_size)
 
     @always_inline
     @parameter
     fn worker():
-        var bres = softmax(arr, size)
+        var bres = softmax(arr, bench_size)
         benchmark.keep(bres)  # do not optimize out
         bres.free()
 

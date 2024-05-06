@@ -6,7 +6,7 @@ import memory
 import benchmark
 
 alias type = DType.int8
-
+alias bench_size = 1000000
 
 fn quicksort(inout data: DTypePointer[type], left: Int, right: Int):
     if left >= right:
@@ -47,18 +47,17 @@ def test():
 fn main() raises:
     test()
     # size is 1 arg from sys
-    var size = StringRef.__int__(sys.argv()[1])
-    var arr = DTypePointer[type].alloc(size)
-    rand(arr, size)
+    var arr = DTypePointer[type].alloc(bench_size)
+    rand(arr, bench_size)
 
     var py = Python.import_module("builtins")
 
     @always_inline
     @parameter
     fn worker():
-        var temp = DTypePointer[type].alloc(size)
-        memcpy(temp, arr, size)
-        quicksort(temp, 0, size - 1)
+        var temp = DTypePointer[type].alloc(bench_size)
+        memcpy[bench_size](temp, arr)
+        quicksort(temp, 0, bench_size - 1)
         temp.free()
 
     var r = benchmark.run[worker](max_runtime_secs=5)

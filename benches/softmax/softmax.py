@@ -3,6 +3,8 @@ import sys
 import time
 import numpy as np
 
+bench_size = 10000
+
 
 def softmax_np(x):
     maxes = np.max(x, axis=1, keepdims=True)[0]
@@ -30,10 +32,9 @@ def test():
 
 def main():
     test()
-    size = int(sys.argv[1]) if len(sys.argv) > 1 else 1000
 
     rng = np.random.default_rng(42)
-    numpy_in = rng.random((size, 1))
+    numpy_in = rng.random((bench_size, 1))
     native_in = numpy_in.flatten().tolist()
 
     # warm up

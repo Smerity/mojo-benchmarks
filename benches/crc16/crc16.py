@@ -3,6 +3,7 @@ import numpy as np
 
 import time
 
+bench_size = 100000
 
 # Adapted from https://gist.github.com/oysstu/68072c44c02879a2abf94ef350d1c7c6
 def crc16(data, poly=0x8408):
@@ -46,12 +47,9 @@ def test():
 
 
 def main():
-
     test()
 
-    arr_size = int(sys.argv[1])
-
-    arr = initialize(arr_size)
+    arr = initialize(bench_size)
 
     # warm up
     crc16(arr)

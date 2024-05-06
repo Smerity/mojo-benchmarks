@@ -2,6 +2,9 @@ use std::fs::File;
 use std::hint::black_box;
 use std::io::Read;
 
+#[allow(non_upper_case_globals)]
+const bench_size: usize = 1000000;
+
 fn softmax(x: &[f64]) -> Vec<f64> {
     let mut max = x[0];
     for i in 1..x.len() {
@@ -27,16 +30,14 @@ fn softmax(x: &[f64]) -> Vec<f64> {
 
 fn main() {
     test();
-    let size = std::env::args().nth(1).unwrap();
-    let size = size.parse::<usize>().unwrap();
     // arr is u8 1000000 of random elements allocated on heap
-    let mut random_arr = vec![0u8; size * 8];
+    let mut random_arr = vec![0u8; bench_size * 8];
     let mut f = File::open("/dev/urandom").unwrap();
     f.read_exact(&mut random_arr).unwrap();
 
-    let mut arr = vec![0f64; size];
+    let mut arr = vec![0f64; bench_size];
     // convert random bytes to f64
-    for i in 0..size {
+    for i in 0..bench_size {
         arr[i] = f64::from_le_bytes([
             random_arr[i * 8],
             random_arr[i * 8 + 1],

@@ -55,7 +55,7 @@ def main():
         softmax_np(numpy_in)
     end = time.time()
 
-    print(f"Mean time (numpy): {((end - start) / times)*1000}ms")
+    print(f"Mean time  (numpy): {((end - start) / times)*1000}ms")
 
 
 if __name__ == "__main__":

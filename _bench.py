@@ -26,6 +26,7 @@ def bench_rust(name, size):
 size_defaults = {
     "crc16": 100000,
     "quicksort": 10000,
+    "softmax": 100000,
 }
 
 

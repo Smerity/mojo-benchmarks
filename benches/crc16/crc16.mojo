@@ -50,7 +50,6 @@ fn test() raises:
         raise "Test failed"
 
 
-
 fn main() raises:
     test()
     # size is 1 arg from sys

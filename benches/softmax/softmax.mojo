@@ -6,6 +6,7 @@ import math
 
 alias type = DType.float64
 alias bench_size = 2048
+alias _simd_width = 2048
 
 """
 
@@ -16,6 +17,104 @@ def softmax_native(x: list[float]) -> list[float]:
     probs = [xi / x_exp_sum for xi in x_exp]
     return probs
 """
+
+
+struct NiceVec[T: DType, size: Int, simd_width: Int]:
+    var data: DTypePointer[T]
+
+    alias simd_count = size // simd_width
+    alias remainder_count = size % simd_width
+
+    fn __init__(inout self, owned data: DTypePointer[T]):
+        self.data = data
+
+    # fn __copyinit__(inout self, existing: NiceVec[T, simd_width]):
+    #     self.data = DTypePointer[T].alloc(existing.size)
+    #     # print("Allocated, bad! ", existing.size)
+    #     memcpy(self.data, existing.data, existing.size)
+    #     self.size = existing.size
+
+    fn __moveinit__(inout self, owned existing: NiceVec[T, simd_width]):
+        self.data = existing.data
+
+    fn __getitem__(self, index: Int) -> SIMD[T, size=1]:
+        return self.data[index]
+
+    fn max(self) -> SIMD[T, 1]:
+        var max = self.data[self.size - 1]
+
+        @unroll
+        for i in range(self.simd_count):
+            var simd = self.data.load[width=simd_width](i)
+            max = math.max(max, simd.reduce_max())
+
+        @unroll
+        for i in range(self.size - self.remainder_count, self.size - 1):
+            var simd = self.data.load[width=1](i)
+            max = math.max(max, simd[0])
+
+        return max
+
+    fn reduce_add(self) -> SIMD[T, 1]:
+        var sum = SIMD[T, 1](0.0)
+
+        @unroll
+        for i in range(self.simd_count):
+            var simd = self.data.load[width=simd_width](i)
+            sum += simd.reduce_add()
+
+        @unroll
+        for i in range(self.size - self.remainder_count, self.size):
+            var simd = self.data.load[width=1](i)
+            sum += simd[0]
+
+        return sum
+
+    fn exp(self, owned res: DTypePointer[T]) -> NiceVec[T, size, simd_width]:
+        @unroll
+        for i in range(self.simd_count):
+            var simd = self.data.load[width=simd_width](i)
+
+            res.store(i, math.exp(simd))
+
+        @unroll
+        for i in range(self.size - self.remainder_count, self.size):
+            var simd = self.data.load[width=1](i)
+            res[i] = math.exp(simd[0])
+
+        return NiceVec[T, self.size, simd_width](res)
+
+    fn sub(
+        self, scalar: SIMD[T, size=1], owned res: DTypePointer[T]
+    ) -> NiceVec[T, size, simd_width]:
+        @unroll
+        for i in range(self.simd_count):
+            var simd = self.data.load[width=simd_width](i)
+
+            res.store(i, simd - scalar)
+
+        @unroll
+        for i in range(self.size - self.remainder_count, self.size):
+            var simd = self.data.load[width=1](i)
+            res[i] = simd - scalar
+
+        return NiceVec[T, size, simd_width](res)
+
+    fn div(
+        self, scalar: SIMD[T, size=1], owned res: DTypePointer[T]
+    ) -> NiceVec[T, size, simd_width]:
+        @unroll
+        for i in range(self.simd_count):
+            var simd = self.data.load[width=simd_width](i)
+
+            res.store(i, simd / scalar)
+
+        @unroll
+        for i in range(self.size - self.remainder_count, self.size):
+            var simd = self.data.load[width=1](i)
+            res[i] = simd / scalar
+
+        return NiceVec[T, size, simd_width](res)
 
 
 fn softmax[
@@ -49,6 +148,22 @@ fn softmax_simd[size: Int](x: SIMD[type, size]) -> SIMD[type, size]:
     return probs
 
 
+fn softmax_simd_proper[
+    size: Int, simd_width: Int
+](x: NiceVec[type, size, _simd_width], res: DTypePointer[type]) -> NiceVec[
+    type, size, _simd_width
+]:
+    var max = x.max()
+
+    var x_subbed = x.sub(max, stack_allocation[size, type]())
+
+    var x_exp = x_subbed.exp(stack_allocation[size, type]())
+
+    var x_sum: SIMD[type, 1] = x_exp.reduce_add()
+
+    return x_exp.div(x_sum, res)
+
+
 def test():
     # import python softmax.py and compare with result of softmax_native(x)
     Python.add_to_path(".")
@@ -60,7 +175,7 @@ def test():
     alias testsize = 16
 
     var mojoin = stack_allocation[testsize, type]()
-    var mojosimdin = mojoin.load[width=testsize]()
+    var mojosimdin = NiceVec[type, testsize, _simd_width](mojoin)
     var res_mojo = stack_allocation[testsize, type]()
 
     pyin = py.list()
@@ -71,7 +186,12 @@ def test():
 
     var res_py = pysoftmax.softmax_native(pyin)
     var _a = softmax[testsize](mojoin, res_mojo)
-    var res_simd_mojo = softmax_simd(mojosimdin)
+    var res_simd_mojo = softmax_simd[testsize](
+        mojoin.gather[width=testsize](SIMD[DType.int32, testsize](0))
+    )
+    var res_simd_proper_mojo = softmax_simd_proper[testsize, 2](
+        mojosimdin, stack_allocation[testsize, type]()
+    )
 
     for i in range(testsize):
         # acceptable error margin due to float precision
@@ -85,11 +205,11 @@ def test():
             raise "Test fail"
 
         # compare mojo with mojo simd now
-        if math.abs(res_mojo[i] - res_simd_mojo[i]) > 1e-6:
+        if math.abs(res_mojo[i] - res_simd_proper_mojo[i]) > 1e-6:
             py.print(py.str("Mismatch at index {}").format(i))
             py.print(
                 py.str("Mojo: {}, Mojo SIMD: {}").format(
-                    res_mojo[i], res_simd_mojo[i]
+                    res_mojo[i], res_simd_proper_mojo[i]
                 )
             )
             raise "Test fail"
@@ -116,17 +236,32 @@ fn main() raises:
         benchmark.keep(bres)  # do not optimize out
 
     var r = benchmark.run[worker](max_runtime_secs=5)
-    py.print(py.str("Mean time (naive): {}ms").format(r.mean("ms")))
+    py.print(py.str("Mean time (native): {}ms").format(r.mean("ms")))
 
     # now do simd
-    var simd_arr = arr.load[width=bench_size]()
-    var _r = softmax_simd[bench_size](simd_arr)
+    var simd_arr = NiceVec[type, bench_size, _simd_width](arr)
+    var _r = softmax_simd_proper[bench_size, _simd_width](simd_arr, dummy)
 
     @always_inline
     @parameter
-    fn worker_simd():
-        var bres = softmax_simd[bench_size](simd_arr)
+    fn worker_simd_proper():
+        var bres = softmax_simd_proper[bench_size, _simd_width](
+            simd_arr, stack_allocation[bench_size, type]()
+        )
         benchmark.keep(bres)  # do not optimize out
 
-    var r_simd = benchmark.run[worker_simd](max_runtime_secs=5)
-    py.print(py.str("Mean time  (SIMD): {}ms").format(r_simd.mean("ms")))
+    var r_simd = benchmark.run[worker_simd_proper](max_runtime_secs=5)
+    py.print(py.str("Mean time (SIMD A): {}ms").format(r_simd.mean("ms")))
+
+    if bench_size == 2048:
+        var simd_arr = arr.gather[width=bench_size](SIMD[DType.int32, 1](0.0))
+        var _r = softmax_simd[bench_size](simd_arr)
+
+        @always_inline
+        @parameter
+        fn worker_simd():
+            var bres = softmax_simd[bench_size](simd_arr)
+            benchmark.keep(bres)  # do not optimize out
+
+        var r_simd = benchmark.run[worker_simd](max_runtime_secs=5)
+        py.print(py.str("Mean time (SIMD B): {}ms").format(r_simd.mean("ms")))

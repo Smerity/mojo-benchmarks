@@ -57,7 +57,7 @@ def bench_rust(name, size):
 size_defaults = {
     "crc16": 100000,
     "quicksort": 10000,
-    "softmax": 10000,
+    "softmax": 2048,
 }
 
 
@@ -76,6 +76,10 @@ def do_bench(name, size):
 
 
 def main():
+    # mkdir tmp
+    if not os.path.exists("tmp"):
+        os.mkdir("tmp")
+
     if len(sys.argv) < 2:
         # bench all
         print("Benching all")
@@ -94,6 +98,9 @@ def main():
     size = sys.argv[2] if len(sys.argv) > 2 else size_defaults[name]
 
     do_bench(name, size)
+
+    # cleanup tmp
+    # os.system("rm -r tmp")
 
 
 if __name__ == "__main__":

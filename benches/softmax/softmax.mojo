@@ -19,26 +19,26 @@ def softmax_native(x: list[float]) -> list[float]:
 
 
 fn softmax[
-    len: Int
+    size: Int
 ](x: DTypePointer[type], res_ptr: DTypePointer[type]) -> DTypePointer[type]:
     var max = x[0]
-    for i in range(1, len):
+    for i in range(1, size):
         if x[i] > max:
             max = x[i]
 
-    var x_exp = stack_allocation[len, type]()
+    var x_exp = stack_allocation[size, type]()
     var x_exp_sum = 0.0
-    for i in range(len):
+    for i in range(size):
         x_exp[i] = math.exp(x[i] - max)
         x_exp_sum += x_exp[i]
 
-    for i in range(len):
+    for i in range(size):
         res_ptr[i] = x_exp[i] / x_exp_sum
 
     return res_ptr
 
 
-fn softmax_simd[len: Int](x: SIMD[type, len]) -> SIMD[type, len]:
+fn softmax_simd[size: Int](x: SIMD[type, size]) -> SIMD[type, size]:
     var max = x.reduce_max()
 
     var x_exp = math.exp(x - max)
@@ -120,12 +120,12 @@ fn main() raises:
 
     # now do simd
     var simd_arr = arr.load[width=bench_size]()
-    var res_simd = softmax_simd(simd_arr)
+    var _r = softmax_simd[bench_size](simd_arr)
 
     @always_inline
     @parameter
     fn worker_simd():
-        var bres = softmax_simd(simd_arr)
+        var bres = softmax_simd[bench_size](simd_arr)
         benchmark.keep(bres)  # do not optimize out
 
     var r_simd = benchmark.run[worker_simd](max_runtime_secs=5)

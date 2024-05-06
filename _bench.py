@@ -30,14 +30,7 @@ size_defaults = {
 }
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("usage: bench.py <name> [size]")
-        return
-
-    name = sys.argv[1]
-    size = sys.argv[2] if len(sys.argv) > 2 else size_defaults[name]
-
+def do_bench(name, size):
     path = os.path.join("benches", name, name + ".py")
     if not os.path.exists(path):
         print("no bench named", name)
@@ -49,6 +42,27 @@ def main():
     bench_rust(name, size)
 
     print(f"----- Done {name}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        # bench all
+        print("Benching all")
+
+        for name in os.listdir("benches"):
+            if name.startswith("."):
+                continue
+
+            do_bench(name, size_defaults[name])
+            print("\n--------------------\n")
+
+        print("Done all!")
+        return
+
+    name = sys.argv[1]
+    size = sys.argv[2] if len(sys.argv) > 2 else size_defaults[name]
+
+    do_bench(name, size)
 
 
 if __name__ == "__main__":

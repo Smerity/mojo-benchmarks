@@ -54,7 +54,7 @@ fn test() raises:
 fn main() raises:
     test()
     # size is 1 arg from sys
-    var arr = DTypePointer[type].alloc(bench_size)
+    var arr = stack_allocation[bench_size, type]()
     # seed(1)
     rand(arr, bench_size)
 
@@ -70,8 +70,6 @@ fn main() raises:
         benchmark.keep(bres)  # do not optimize out
 
     var r = benchmark.run[worker](max_runtime_secs=5)
-
-    arr.free()
 
     # _ = py.print(py.str("Result: {}, iters: {}").format(res, iters))
 

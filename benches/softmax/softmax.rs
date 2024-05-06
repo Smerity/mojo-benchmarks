@@ -5,7 +5,7 @@ use std::io::Read;
 #[allow(non_upper_case_globals)]
 const bench_size: usize = 1000000;
 
-fn softmax(x: &[f64]) -> Vec<f64> {
+fn softmax(x: &[f64; bench_size]) -> [f64; bench_size] {
     let mut max = x[0];
     for i in 1..x.len() {
         if x[i] > max {
@@ -13,14 +13,14 @@ fn softmax(x: &[f64]) -> Vec<f64> {
         }
     }
 
-    let mut x_exp = vec![0.0; x.len()];
+    let mut x_exp = [0.0; bench_size];
     let mut x_exp_sum = 0.0;
     for i in 0..x.len() {
         x_exp[i] = (x[i] - max).exp();
         x_exp_sum += x_exp[i];
     }
 
-    let mut probs = vec![0.0; x.len()];
+    let mut probs = [0.0; bench_size];
     for i in 0..x.len() {
         probs[i] = x_exp[i] / x_exp_sum;
     }
@@ -30,12 +30,11 @@ fn softmax(x: &[f64]) -> Vec<f64> {
 
 fn main() {
     test();
-    // arr is u8 1000000 of random elements allocated on heap
-    let mut random_arr = vec![0u8; bench_size * 8];
+    let mut random_arr = [0u8; bench_size * 8];
     let mut f = File::open("/dev/urandom").unwrap();
     f.read_exact(&mut random_arr).unwrap();
 
-    let mut arr = vec![0f64; bench_size];
+    let mut arr = [0f64; bench_size];
     // convert random bytes to f64
     for i in 0..bench_size {
         arr[i] = f64::from_le_bytes([

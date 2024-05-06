@@ -5,7 +5,7 @@ from python import Python
 import math
 
 alias type = DType.float64
-alias bench_size = 100000
+alias bench_size = 2048
 
 """
 
@@ -18,23 +18,34 @@ def softmax_native(x: list[float]) -> list[float]:
 """
 
 
-fn softmax[len: Int](x: DTypePointer[type]) -> DTypePointer[type]:
+fn softmax[
+    len: Int
+](x: DTypePointer[type], res_ptr: DTypePointer[type]) -> DTypePointer[type]:
     var max = x[0]
     for i in range(1, len):
         if x[i] > max:
             max = x[i]
 
-    var x_exp = DTypePointer[type].alloc(len)
+    var x_exp = stack_allocation[len, type]()
     var x_exp_sum = 0.0
     for i in range(len):
         x_exp[i] = math.exp(x[i] - max)
         x_exp_sum += x_exp[i]
 
-    var probs = DTypePointer[type].alloc(len)
     for i in range(len):
-        probs[i] = x_exp[i] / x_exp_sum
+        res_ptr[i] = x_exp[i] / x_exp_sum
 
-    x_exp.free()
+    return res_ptr
+
+
+fn softmax_simd[len: Int](x: SIMD[type, len]) -> SIMD[type, len]:
+    var max = x.reduce_max()
+
+    var x_exp = math.exp(x - max)
+    var x_sum = x.reduce_add()
+
+    var probs = x_exp / x_sum
+
     return probs
 
 
@@ -46,18 +57,23 @@ def test():
     var py = Python.import_module("builtins")
     var pyrandom = Python.import_module("random")
 
-    var mojoin = DTypePointer[type].alloc(10)
+    alias testsize = 16
+
+    var mojoin = stack_allocation[testsize, type]()
+    var mojosimdin = mojoin.load[width=testsize]()
+    var res_mojo = stack_allocation[testsize, type]()
 
     pyin = py.list()
-    for i in range(10):
+    for i in range(testsize):
         var val = pyrandom.random()
         pyin.append(val)
         mojoin[i] = val.to_float64()
 
     var res_py = pysoftmax.softmax_native(pyin)
-    var res_mojo = softmax[10](mojoin)
+    var _a = softmax[testsize](mojoin, res_mojo)
+    var res_simd_mojo = softmax_simd(mojosimdin)
 
-    for i in range(10):
+    for i in range(testsize):
         # acceptable error margin due to float precision
         if math.abs(res_py[i].to_float64() - res_mojo[i]) > 1e-6:
             py.print(py.str("Mismatch at index {}").format(i))
@@ -68,30 +84,49 @@ def test():
             )
             raise "Test fail"
 
+        # compare mojo with mojo simd now
+        if math.abs(res_mojo[i] - res_simd_mojo[i]) > 1e-6:
+            py.print(py.str("Mismatch at index {}").format(i))
+            py.print(
+                py.str("Mojo: {}, Mojo SIMD: {}").format(
+                    res_mojo[i], res_simd_mojo[i]
+                )
+            )
+            raise "Test fail"
+
 
 fn main() raises:
     test()
 
-    var arr = DTypePointer[type].alloc(bench_size)
+    var arr = stack_allocation[bench_size, type]()
     # seed(1)
     rand(arr, bench_size)
 
     var py = Python.import_module("builtins")
     # _ = py.print(py.str("Starting benchmark, size {}...").format(size))
 
-    var res = softmax[bench_size](arr)
+    var dummy = stack_allocation[bench_size, type]()
+
+    var res = softmax[bench_size](arr, dummy)
 
     @always_inline
     @parameter
     fn worker():
-        var bres = softmax[bench_size](arr)
+        var bres = softmax[bench_size](arr, dummy)
         benchmark.keep(bres)  # do not optimize out
-        bres.free()
 
     var r = benchmark.run[worker](max_runtime_secs=5)
+    py.print(py.str("Mean time (naive): {}ms").format(r.mean("ms")))
 
-    arr.free()
+    # now do simd
+    var simd_arr = arr.load[width=bench_size]()
+    var res_simd = softmax_simd(simd_arr)
 
-    # _ = py.print(py.str("Result: {}, iters: {}").format(res, iters))
+    @always_inline
+    @parameter
+    fn worker_simd():
+        var bres = softmax_simd(simd_arr)
+        benchmark.keep(bres)  # do not optimize out
 
-    py.print(py.str("Mean time: {}ms").format(r.mean("ms")))
+    var r_simd = benchmark.run[worker_simd](max_runtime_secs=5)
+    py.print(py.str("Mean time  (SIMD): {}ms").format(r_simd.mean("ms")))

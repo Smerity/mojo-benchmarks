@@ -41,7 +41,7 @@ def main():
     softmax_native(native_in)
     softmax_np(numpy_in)
 
-    times = 100
+    times = 1000
     # bench
     start = time.time()
     for i in range(times):

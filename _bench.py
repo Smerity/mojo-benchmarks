@@ -58,6 +58,7 @@ size_defaults = {
     "crc16": 100000,
     "quicksort": 10000,
     "softmax": 2048,
+    "matmul": 256,
 }
 
 

@@ -180,7 +180,7 @@ fn main() raises:
     py.print(py.str("Mean time (SIMD A): {}ms").format(r_simd.mean("ms")))
 
     if bench_size == 2048:
-        var simd_arr = arr.gather[width=bench_size](SIMD[DType.int32, 1](0.0))
+        var simd_arr = arr.load[width=bench_size](0)
         var _r = softmax_simd[bench_size](simd_arr)
 
         @always_inline

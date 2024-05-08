@@ -1,4 +1,5 @@
 #![feature(portable_simd)]
+#![feature(stdarch_x86_avx512)]
 
 use std::fs::File;
 use std::hint::black_box;
@@ -8,12 +9,14 @@ use std::simd::num::SimdFloat;
 use std::simd::StdFloat;
 
 #[allow(non_upper_case_globals)]
-const bench_size: usize = 8192;
+const bench_size: usize = 2048;
 
-use std::simd::f64x64;
-type SimdType = f64x64;
-const SIMD_SIZE: usize = 64;
+use std::simd::f64x8;
+type SimdType = f64x8;
+const SIMD_SIZE: usize = 8;
 const SIMD_COUNT: usize = bench_size / SIMD_SIZE;
+
+use std::arch::x86_64::*;
 
 fn softmax(x: &[f64; bench_size]) -> [f64; bench_size] {
     let mut max = x[0];
@@ -36,6 +39,46 @@ fn softmax(x: &[f64; bench_size]) -> [f64; bench_size] {
     }
 
     probs
+}
+
+fn softmax_intr(x: &[f64; bench_size]) -> [f64; bench_size] {
+    let max = x[0];
+    let mut max: __m512d = __m512d::from(SimdType::splat(max));
+    for a in x.chunks_exact(8) {
+        unsafe {
+            let v = _mm512_loadu_pd(a.as_ptr());
+            max = _mm512_max_pd(max, v);
+        }
+    }
+
+    let mut x_exp = [0.0; bench_size];
+    let mut x_exp_sum: __m512d = __m512d::from(SimdType::splat(0.0));
+    let constant_e: __m512d = __m512d::from(SimdType::splat(std::f64::consts::E));
+    for (a, dst) in x.chunks_exact(8).zip(x_exp.chunks_exact_mut(8)) {
+        unsafe {
+            let v = _mm512_loadu_pd(a.as_ptr());
+            let v = _mm512_sub_pd(v, max);
+
+            /// NOTE: What do you mean there's on _mm512_exp_pd??!!??!?!?
+            let v = _mm512_mul_pd(constant_e, v);
+            //let v = _mm512_pow_pd(constant_e, v);
+
+            _mm512_storeu_pd(dst.as_mut_ptr(), v);
+            x_exp_sum = _mm512_add_pd(x_exp_sum, v);
+        }
+    }
+    let x_esp_sum = f64x8::from(x_exp_sum).reduce_sum();
+    let x_esp_sum: __m512d = __m512d::from(SimdType::splat(x_esp_sum));
+
+    for dst in x_exp.chunks_exact_mut(8) {
+        unsafe {
+            let v = _mm512_loadu_pd(dst.as_ptr());
+            let v = _mm512_div_pd(v, x_esp_sum);
+            _mm512_storeu_pd(dst.as_mut_ptr(), v);
+        }
+    }
+
+    x_exp
 }
 
 fn softmax_simd(x: &[SimdType; SIMD_COUNT]) -> [SimdType; SIMD_COUNT] {
@@ -113,6 +156,8 @@ fn main() {
         ]);
     }
 
+    println!("Length in f64: {}", arr.len());
+
     softmax(black_box(&arr));
 
     // println!("starting..");
@@ -122,6 +167,19 @@ fn main() {
     let count = 1000;
     for _ in 0..count {
         black_box(softmax(&arr));
+    }
+    let elapsed = start.elapsed().as_nanos();
+
+    println!(
+        "Mean time (native): {}ms",
+        elapsed as f64 / 1000.0 / 1000.0 / count as f64
+    );
+
+    // benchmark this 1000 times, get mean
+    let start = std::time::Instant::now();
+    let count = 1000;
+    for _ in 0..count {
+        black_box(softmax_intr(&arr));
     }
     let elapsed = start.elapsed().as_nanos();
 
